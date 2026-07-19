@@ -1,0 +1,21 @@
+{
+	"compilerOptions": {
+		"target": "es2024",
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"lib": ["es2024"],
+		"types": ["@types/node"],
+
+		"strict": true,
+		"noEmit": true,
+		"isolatedModules": true,
+
+		"esModuleInterop": true,
+		"forceConsistentCasingInFileNames": true,
+		"skipLibCheck": true,
+		"resolveJsonModule": true,
+		"ignoreDeprecations": "6.0"
+	},
+	"include": ["source/**/*.ts"],
+	"exclude": ["node_modules", "build"]
+}
