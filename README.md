@@ -144,7 +144,7 @@ Below is a benchmark comparing the raw tokenization speed of `lua-lexer` against
 | **lua-lexer** | **~0.83 ms** | **~1.50x Faster** |
 | luaparse | ~1.24 ms | Baseline (1.0x) |
 
-> **Note:** For full methodology, reproduction instructions, and details on optimizations like `skipComments`, please read the [Performance Benchmarks](./benchmarks/README.md) documentation.
+> **Note:** For full methodology, reproduction instructions and details please read the [Performance Benchmarks](./benchmarks/README.md) documentation.
 
 
 ## Acknowledgements
