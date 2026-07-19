@@ -105,6 +105,10 @@ const enum CharacterCodes {
     UPPER_Z = 90, // Z
 }
 
+/**
+ * Represents the type of a scanned Lua token.
+ * Contains values for keywords, operators, literals, and special tokens.
+ */
 export const enum LuaTokenType {
     // End of File
     END_OF_FILE,
@@ -123,7 +127,7 @@ export const enum LuaTokenType {
     AMPERSAND,      TILDE,        PIPE,         LESS_LESS,      GREATER_GREATER,    DOUBLE_SLASH,
     EQUAL_EQUAL,    TILDE_EQUAL,  LESS_EQUAL,   GREATER_EQUAL,  LESS,               GREATER,        EQUAL,
     LEFT_PAREN,     RIGHT_PAREN,  LEFT_BRACE,   RIGHT_BRACE,    LEFT_BRACKET,       RIGHT_BRACKET,  DOUBLE_COLON,
-    SEMICOLON,      COLON,        COMMA, DOT,   DOUBLE_DOT,     TRIPLE_DOT,
+    SEMICOLON,      COLON,        COMMA,        DOT,            DOUBLE_DOT,         TRIPLE_DOT,
 
     // Literals
     STRING_LITERAL,   NUMBER_LITERAL,
@@ -135,22 +139,85 @@ export const enum LuaTokenType {
     COMMENT
 }
 
+/**
+ * Represents the value extracted from a token.
+ * - Strings for identifiers, string literals, and comments.
+ * - Numbers for numeric literals.
+ * - Booleans for `true` and `false`.
+ * - `null` for `nil`.
+ * - `undefined` for punctuation and generic keywords.
+ */
 export type LuaTokenValue = string | number | boolean | null | undefined;
+
+/**
+ * Represents a single lexical token emitted by the LuaLexer.
+ */
 export interface LuaToken {
+    /** The categorized type of the token. */
     type: LuaTokenType;
+    /** The parsed value of the token (e.g. the actual number, string content). */
     value: LuaTokenValue;
+    /** The 1-indexed line number where the token starts. */
     line: number;
+    /** The 0-indexed column number where the token starts. */
     column: number;
+    /** The 0-indexed absolute string index where the token begins in the source. */
     start: number;
+    /** The length of the token in characters. */
     length: number;
 }
 
+/**
+ * Options to configure the behavior of LuaLexer.
+ */
+export interface LuaLexerOptions {
+    /**
+     * If true, the lexer will skip over comments and not emit them as tokens.
+     * @default false
+     */
+    skipComments?: boolean;
+    
+    /**
+     * The specific Lua language version to tokenize against.
+     * Determines the availability of certain operators, keywords, and escape sequences.
+     * @default "5.4"
+     */
+    luaVersion?: "5.1" | "5.2" | "5.3" | "5.4" | "5.5";
+}
+
+/**
+ * A highly optimized lexical analyzer for Lua source code.
+ */
 export class LuaLexer {
     private raw:       string = "";
     private index:     number = 0;
     private line:      number = 1;
     private lineStart: number = 0;
+    public options:   LuaLexerOptions;
 
+    private isLua52Plus: boolean;
+    private isLua53Plus: boolean;
+    private isLua55Plus: boolean;
+    private skipComments: boolean;
+
+    /**
+     * Creates a new instance of the LuaLexer.
+     * @param options Configuration options for the lexer behavior.
+     */
+    constructor(options: LuaLexerOptions = {}) {
+        this.options = options;
+        this.skipComments = options.skipComments === true;
+        const version = options.luaVersion || "5.4";
+        this.isLua52Plus = version !== "5.1";
+        this.isLua53Plus = version !== "5.1" && version !== "5.2";
+        this.isLua55Plus = version === "5.5";
+    }
+
+    /**
+     * Loads a new Lua source string into the lexer and resets its internal state.
+     * Appends an internal null-terminator sentinel to safely avoid out-of-bounds checks.
+     * @param source The raw Lua source code string to scan.
+     */
     load(source: string) {
         this.raw = source + "\0\0\0\0\0\0\0\0"; // add sentinel to prevent out of bounds
         this.index = 0;
@@ -187,6 +254,12 @@ export class LuaLexer {
         return token;
     }
 
+    /**
+     * Scans and returns the next lexical token from the loaded source code.
+     * This method automatically skips whitespaces. 
+     * If the end of the file is reached, it yields an `END_OF_FILE` token.
+     * @returns The parsed LuaToken.
+     */
     next(): LuaToken {
         const raw = this.raw;
 
@@ -308,6 +381,7 @@ export class LuaLexer {
                     this.lineStart = lineStart;
 
                     if (raw.charCodeAt(index + 1) === CharacterCodes.SLASH) { // operator (//)
+                        if (!this.isLua53Plus) return this.yieldToken(LuaTokenType.SLASH, undefined, 1);
                         return this.yieldToken(LuaTokenType.DOUBLE_SLASH, undefined, 2);
                     } else { // operator (/)
                         return this.yieldToken(LuaTokenType.SLASH, undefined, 1);
@@ -323,6 +397,7 @@ export class LuaLexer {
                     if (raw.charCodeAt(index + 1) === CharacterCodes.EQUAL) { // operator (~=)
                         return this.yieldToken(LuaTokenType.TILDE_EQUAL, undefined, 2);
                     } else { // operator (~)
+                        if (!this.isLua53Plus) return this.yieldToken(LuaTokenType.ERROR, "unexpected symbol '~'", 1);
                         return this.yieldToken(LuaTokenType.TILDE, undefined, 1);
                     }
                 }
@@ -347,6 +422,7 @@ export class LuaLexer {
                     this.lineStart = lineStart;
 
                     if (raw.charCodeAt(index + 1) === CharacterCodes.COLON) { // punctator (::)
+                        if (!this.isLua52Plus) return this.yieldToken(LuaTokenType.COLON, undefined, 1);
                         return this.yieldToken(LuaTokenType.DOUBLE_COLON, undefined, 2);
                     } else { // punctator (:)
                         return this.yieldToken(LuaTokenType.COLON, undefined, 1);
@@ -361,6 +437,7 @@ export class LuaLexer {
 
                     const second = raw.charCodeAt(index + 1);
                     if (second === CharacterCodes.LESS) {
+                        if (!this.isLua53Plus) return this.yieldToken(LuaTokenType.LESS, undefined, 1);
                         return this.yieldToken(LuaTokenType.LESS_LESS, undefined, 2);
                     } else if (second === CharacterCodes.EQUAL) {
                         return this.yieldToken(LuaTokenType.LESS_EQUAL, undefined, 2);
@@ -377,6 +454,7 @@ export class LuaLexer {
 
                     const second = raw.charCodeAt(index + 1);
                     if (second === CharacterCodes.GREATER) {
+                        if (!this.isLua53Plus) return this.yieldToken(LuaTokenType.GREATER, undefined, 1);
                         return this.yieldToken(LuaTokenType.GREATER_GREATER, undefined, 2);
                     } else if (second === CharacterCodes.EQUAL) {
                         return this.yieldToken(LuaTokenType.GREATER_EQUAL, undefined, 2);
@@ -400,7 +478,7 @@ export class LuaLexer {
                     }
 
                     if (raw.charCodeAt(cursor) === CharacterCodes.LEFT_BRACKET) { // multiline string ([=[ ]=])
-                        return this.readLongStringLiteralOrComment(level, false);
+                        return this.readLongStringLiteralOrComment(level, false)!;
                     } else { // punctator ([])
                         return this.yieldToken(LuaTokenType.LEFT_BRACKET, undefined, 1);
                     }
@@ -429,7 +507,13 @@ export class LuaLexer {
 
                         // multiline comment found
                         if (raw.charCodeAt(cursor) === CharacterCodes.LEFT_BRACKET) {
-                            return this.readLongStringLiteralOrComment(level, true);
+                            const token = this.readLongStringLiteralOrComment(level, true);
+                            if (token) return token;
+                            
+                            index = this.index;
+                            line = this.line;
+                            lineStart = this.lineStart;
+                            continue;
                         }
                     }
 
@@ -439,6 +523,12 @@ export class LuaLexer {
                         const character = raw.charCodeAt(cursor);
                         if (character === CharacterCodes.CR || character === CharacterCodes.LF) break;
                         cursor++;
+                    }
+
+                    if (this.skipComments) {
+                        this.index = cursor;
+                        index = cursor;
+                        continue;
                     }
 
                     return this.yieldToken(LuaTokenType.COMMENT, raw.substring(index + 2, cursor), cursor - index);
@@ -484,6 +574,7 @@ export class LuaLexer {
                     this.index = index;
                     this.line = line;
                     this.lineStart = lineStart;
+                    if (!this.isLua53Plus) return this.yieldToken(LuaTokenType.ERROR, "unexpected symbol '&'", 1);
                     return this.yieldToken(LuaTokenType.AMPERSAND, undefined, 1);
                 }
 
@@ -491,6 +582,7 @@ export class LuaLexer {
                     this.index = index;
                     this.line = line;
                     this.lineStart = lineStart;
+                    if (!this.isLua53Plus) return this.yieldToken(LuaTokenType.ERROR, "unexpected symbol '|'", 1);
                     return this.yieldToken(LuaTokenType.PIPE, undefined, 1);
                 }
 
@@ -680,6 +772,7 @@ export class LuaLexer {
 
         // first character is dot, only fractional part is considered
         if (raw.charCodeAt(cursor) === CharacterCodes.DOT) {
+            if (!this.isLua52Plus) hasError = true;
             cursor++;
             let hasDigits = false;
 
@@ -728,6 +821,7 @@ export class LuaLexer {
             }
 
             if (raw.charCodeAt(cursor) === CharacterCodes.DOT) {
+                if (!this.isLua52Plus) hasError = true;
                 cursor++;
 
                 while (true) {
@@ -755,6 +849,7 @@ export class LuaLexer {
 
         // match exponent part if it exists
         if (!hasError && (raw.charCodeAt(cursor) | 32) === CharacterCodes.LOWER_P) {
+            if (!this.isLua52Plus) hasError = true;
             cursor++;
 
             const sign = raw.charCodeAt(cursor);
@@ -889,6 +984,12 @@ export class LuaLexer {
 
                 // \xXX 
                 case CharacterCodes.LOWER_X: {
+                    if (!this.isLua52Plus) {
+                        hasError = true;
+                        errorMessage = "invalid escape sequence";
+                        cursor++;
+                        break;
+                    }
                     cursor++;
                     let code = 0;
                     
@@ -928,6 +1029,12 @@ export class LuaLexer {
 
                 // Obsługa \u{XXX}
                 case CharacterCodes.LOWER_U: {
+                    if (!this.isLua53Plus) {
+                        hasError = true;
+                        errorMessage = "invalid escape sequence";
+                        cursor++;
+                        break;
+                    }
                     cursor++; // skip 'u'
 
                     if (raw.charCodeAt(cursor) !== CharacterCodes.LEFT_BRACE) {
@@ -985,6 +1092,12 @@ export class LuaLexer {
 
                 // Obsługa \z (Płaskie połykanie białych znaków)
                 case CharacterCodes.LOWER_Z: {
+                    if (!this.isLua52Plus) {
+                        hasError = true;
+                        errorMessage = "invalid escape sequence";
+                        cursor++;
+                        break;
+                    }
                     cursor++;
 
                     while (true) {
@@ -1078,7 +1191,7 @@ export class LuaLexer {
         return this.yieldToken(LuaTokenType.ERROR, errorMessage, cursor - index);
     }
 
-    private readLongStringLiteralOrComment(level: number, isComment: boolean): LuaToken {
+    private readLongStringLiteralOrComment(level: number, isComment: boolean): LuaToken | null {
         const raw = this.raw;
         const index = this.index;
 
@@ -1124,8 +1237,10 @@ export class LuaLexer {
             
             // 1. Złączona obsługa nowych linii (lepsze przewidywanie rozgałęzień / branch prediction)
             if (code === CharacterCodes.CR) {
-                if (cursor > chunkStart) value += raw.substring(chunkStart, cursor);
-                value += '\n'; 
+                if (!isComment || !this.skipComments) {
+                    if (cursor > chunkStart) value += raw.substring(chunkStart, cursor);
+                    value += '\n'; 
+                }
                 
                 if (raw.charCodeAt(cursor + 1) === CharacterCodes.LF) {
                     cursor += 2;
@@ -1138,8 +1253,10 @@ export class LuaLexer {
                 chunkStart = cursor;
                 continue;
             } else if (code === CharacterCodes.LF) {
-                if (cursor > chunkStart) value += raw.substring(chunkStart, cursor);
-                value += '\n'; 
+                if (!isComment || !this.skipComments) {
+                    if (cursor > chunkStart) value += raw.substring(chunkStart, cursor);
+                    value += '\n'; 
+                }
                 
                 if (raw.charCodeAt(cursor + 1) === CharacterCodes.CR) {
                     cursor += 2;
@@ -1161,7 +1278,9 @@ export class LuaLexer {
 
                 // check if we have the correct closing delimiter
                 if (equals === level && raw.charCodeAt(cursor + 1 + equals) === CharacterCodes.RIGHT_BRACKET) {
-                    if (cursor > chunkStart) value += raw.substring(chunkStart, cursor);
+                    if (!isComment || !this.skipComments) {
+                        if (cursor > chunkStart) value += raw.substring(chunkStart, cursor);
+                    }
 
                     cursor += 2 + equals; // skip ]=*]
                     isClosed = true;
@@ -1176,12 +1295,18 @@ export class LuaLexer {
         }
 
         // error recovery
-        let token: LuaToken;
+        let token: LuaToken | null = null;
         if (!isClosed) {
-            if (cursor > chunkStart) value += raw.substring(chunkStart, cursor);
+            if (!isComment || !this.skipComments) {
+                if (cursor > chunkStart) value += raw.substring(chunkStart, cursor);
+            }
             token = this.yieldToken(LuaTokenType.ERROR, isComment ? "unfinished long comment" : "unfinished long string", cursor - index);
         } else {
-            token = this.yieldToken(isComment ? LuaTokenType.COMMENT : LuaTokenType.STRING_LITERAL, value, cursor - index);
+            if (isComment && this.skipComments) {
+                this.index = cursor;
+            } else {
+                token = this.yieldToken(isComment ? LuaTokenType.COMMENT : LuaTokenType.STRING_LITERAL, value, cursor - index);
+            }
         }
 
         this.line = localLine;
@@ -1220,9 +1345,12 @@ export class LuaLexer {
             else if (value === "not") return this.yieldToken(LuaTokenType.NOT, undefined, 3);
             else if (value === "nil") return this.yieldToken(LuaTokenType.NIL, null, 3);
             else return this.yieldToken(LuaTokenType.IDENTIFIER, value, length);
-        } if (length === 4) {
+        } else if (length === 4) {
             if (value === "else") return this.yieldToken(LuaTokenType.ELSE, undefined, 4);
-            else if (value === "goto") return this.yieldToken(LuaTokenType.GOTO, undefined, 4);
+            else if (value === "goto") {
+                if (!this.isLua52Plus) return this.yieldToken(LuaTokenType.IDENTIFIER, value, 4);
+                return this.yieldToken(LuaTokenType.GOTO, undefined, 4);
+            }
             else if (value === "then") return this.yieldToken(LuaTokenType.THEN, undefined, 4);
             else if (value === "true") return this.yieldToken(LuaTokenType.TRUE, true, 4);
             else return this.yieldToken(LuaTokenType.IDENTIFIER, value, length);
@@ -1230,13 +1358,17 @@ export class LuaLexer {
             if (value === "break") return this.yieldToken(LuaTokenType.BREAK, undefined, 5);
             else if (value === "local") return this.yieldToken(LuaTokenType.LOCAL, undefined, 5);
             else if (value === "false") return this.yieldToken(LuaTokenType.FALSE, false, 5);
+            else if (value === "until") return this.yieldToken(LuaTokenType.UNTIL, undefined, 5);
             else if (value === "while") return this.yieldToken(LuaTokenType.WHILE, undefined, 5);
             else return this.yieldToken(LuaTokenType.IDENTIFIER, value, length);
         } else if (length === 6) {
             if (value === "elseif") return this.yieldToken(LuaTokenType.ELSEIF, undefined, 6);
             else if (value === "repeat") return this.yieldToken(LuaTokenType.REPEAT, undefined, 6);
             else if (value === "return") return this.yieldToken(LuaTokenType.RETURN, undefined, 6);
-            else if (value === "global") return this.yieldToken(LuaTokenType.GLOBAL, undefined, 6);
+            else if (value === "global") {
+                if (!this.isLua55Plus) return this.yieldToken(LuaTokenType.IDENTIFIER, value, 6);
+                return this.yieldToken(LuaTokenType.GLOBAL, undefined, 6);
+            }
             else return this.yieldToken(LuaTokenType.IDENTIFIER, value, length);
         } else if (length === 8) {
             if (value === "function") return this.yieldToken(LuaTokenType.FUNCTION, undefined, 8);
@@ -1247,8 +1379,8 @@ export class LuaLexer {
     }
 }
 
-export function tokenize(code: string): LuaToken[] {
-    const lexer = new LuaLexer();
+export function tokenize(code: string, options?: LuaLexerOptions): LuaToken[] {
+    const lexer = new LuaLexer(options);
     lexer.load(code);
     return lexer.tokenizeAll();
-}
+}

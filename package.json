@@ -1,6 +1,6 @@
 {
     "name": "lua-lexer",
-    "version": "1.0.1",
+    "version": "1.1.1",
     "description": "A fast Lua lexer written in TypeScript",
     "main": "./build/index.js",
     "module": "./build/index.mjs",
@@ -27,8 +27,7 @@
         "dev": "tsx source/index.ts",
         "build": "tsup",
         "prepare": "npm run build",
-        "bench:conditions": "tsx source/bench-conditions.ts",
-        "bench:conditions:gc": "node --expose-gc ./node_modules/tsx/dist/cli.mjs source/bench-conditions.ts",
+        "bench": "tsx benchmarks/index.ts",
         "format": "prettier . --write"
     },
     "keywords": [
@@ -42,7 +41,10 @@
     "license": "MIT",
     "type": "commonjs",
     "devDependencies": {
-        "@types/node": "^25.5.2",
+        "@types/luaparse": "^0.2.13",
+        "@types/node": "^25.9.5",
+        "luaparse": "^0.3.1",
+        "mitata": "^1.0.34",
         "prettier": "^3.8.1",
         "tsup": "^8.5.1",
         "tsx": "^4.21.0",
