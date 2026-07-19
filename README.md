@@ -149,7 +149,7 @@ Below is a benchmark comparing the raw tokenization speed of `lua-lexer` against
 
 ## Acknowledgements
 
-This project was heavily inspired by the excellent `luaparse` library created by Oskar Schöldström. Ultimately, [`lua-lexer`](https://github.com/fstirlitz/luaparse/) started as a fun experiment with code - a playground to see just how fast and optimized a zero-dependency Lua lexer could be written in TypeScript. 
+This project was heavily inspired by the excellent [`luaparse`](https://github.com/fstirlitz/luaparse/) library created by Oskar Schöldström. Ultimately, `lua-lexer` started as a fun experiment with code - a playground to see just how fast and optimized a zero-dependency Lua lexer could be written in TypeScript. 
 
 
 ## License
