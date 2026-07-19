@@ -20,7 +20,7 @@ npm install lua-lexer
 ## Basic Usage
 
 ```typescript
-import { LuaLexer, LuaTokenType } from "lua-lexer"; // adjust based on your actual package name
+import { tokenize } from "lua-lexer"; // adjust based on your actual package name
 
 const code = `
   local function hello()
@@ -28,19 +28,23 @@ const code = `
   end
 `;
 
-const lexer = new LuaLexer();
-lexer.load(code);
-
-const tokens = [];
-while (true) {
-    const token = lexer.next();
-    tokens.push(token);
-    if (token.type === LuaTokenType.END_OF_FILE) {
-        break;
-    }
-}
-
+const tokens = tokenize(code);
 console.log(tokens);
+```
+
+### Advanced Usage
+
+For parsing large files or advanced scenarios where you need granular control, you can use the `LuaLexer` class directly:
+
+```typescript
+import { LuaLexer, LuaTokenType } from "lua-lexer";
+
+const lexer = new LuaLexer();
+lexer.load("print(123)");
+
+// Read token by token
+const token = lexer.next();
+console.log(token);
 ```
 
 ## License

@@ -1,6 +1,6 @@
 {
     "name": "lua-lexer",
-    "version": "0.1.0",
+    "version": "1.0.1",
     "description": "A fast Lua lexer written in TypeScript",
     "main": "./build/index.js",
     "module": "./build/index.mjs",
@@ -15,6 +15,14 @@
     "files": [
         "build"
     ],
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/Andmarski/lua-lexer.git"
+    },
+    "bugs": {
+        "url": "https://github.com/Andmarski/lua-lexer/issues"
+    },
+    "homepage": "https://github.com/Andmarski/lua-lexer#readme",
     "scripts": {
         "dev": "tsx source/index.ts",
         "build": "tsup",

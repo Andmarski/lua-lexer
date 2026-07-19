@@ -1,4 +1,4 @@
-﻿const enum CharacterCodes {
+const enum CharacterCodes {
     NULL = 0,   // \0 Null character
 
     TAB = 9,    // \t Horizontal Tab
@@ -157,6 +157,19 @@ export class LuaLexer {
         this.line = 1;
         this.lineStart = 0;
     }
+
+    tokenizeAll(): LuaToken[] {
+        const tokens: LuaToken[] = [];
+        while (true) {
+            const token = this.next();
+            tokens.push(token);
+            if (token.type === LuaTokenType.END_OF_FILE) {
+                break;
+            }
+        }
+        return tokens;
+    }
+
 
     private yieldToken(type: LuaTokenType, value: LuaTokenValue, length: number): LuaToken {
         const token = {
@@ -1233,3 +1246,9 @@ export class LuaLexer {
         }
     }
 }
+
+export function tokenize(code: string): LuaToken[] {
+    const lexer = new LuaLexer();
+    lexer.load(code);
+    return lexer.tokenizeAll();
+}
